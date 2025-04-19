@@ -1,0 +1,29 @@
+# Archivos generados por ANTLR4
+*.java
+
+# Directorios y archivos de compilación
+bin/
+obj/
+
+# Archivos y configuraciones de Visual Studio
+.vs/
+.vscode/
+.vs2019/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# Archivos de NuGet
+packages/
+
+# Archivos temporales y del sistema
+Thumbs.db
+.DS_Store
+
+# Archivos de Rider (si usas JetBrains Rider)
+.idea/
+
+# Archivos de configuración específicos del proyecto
+.vsconfig
+.fake

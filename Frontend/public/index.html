@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interfaz</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/midnight.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .navbar {
+            background-color: #333;
+            padding: 10px;
+            border-bottom: 1px solid #444;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .navbar a {
+            margin: 0 15px;
+            text-decoration: none;
+            color: #fff;
+            cursor: pointer;
+        }
+        .submenu {
+            display: none;
+            position: absolute;
+            background-color: #444;
+            border: 1px solid #555;
+            top: 35px;
+            left: 10px;
+            z-index: 1;
+        }
+        .submenu a {
+            display: block;
+            padding: 5px 10px;
+            color: #fff;
+        }
+        .navbar a.active + .submenu {
+            display: block;
+        }
+        .container {
+            display: flex;
+            flex: 1;
+            margin: 20px;
+            overflow: hidden;
+        }
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #333;
+            margin: 0 10px;
+            background-color: #1e1e1e;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        .panel h2 {
+            margin-top: 0;
+            padding: 10px;
+            font-size: 18px;
+            background-color: #2c2c2c;
+            border-bottom: 1px solid #333;
+            color: #e0e0e0;
+            flex-shrink: 0;
+        }
+        .textarea-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            padding: 10px;
+            overflow: hidden;
+        }
+        .CodeMirror {
+            width: 100%;
+            height: 100%;
+            font-family: monospace;
+            line-height: 1.5;
+            box-sizing: border-box;
+        }
+        .readonly .CodeMirror {
+            background-color: #000;
+            color: #00ff00;
+        }
+        .line-count {
+            text-align: right;
+            padding: 5px 10px;
+            font-size: 12px;
+            color: #888;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="#" onclick="toggleSubmenu(event, 'archivo')">Archivo</a>
+        <div class="submenu" id="archivo">
+            <a href="#" onclick="nuevoArchivo(); closeSubmenus()">Nuevo archivo</a>
+            <a href="#" onclick="abrirArchivos(); closeSubmenus()">Abrir archivos</a>
+            <a href="#" onclick="guardarArchivo(); closeSubmenus()">Guardar</a>
+        </div>
+        <a href="#" onclick="executeCode()">Ejecutar</a>
+        <a href="#" onclick="toggleSubmenu(event, 'reportes')">Reportes</a>
+        <div class="submenu" id="reportes">
+            <a href="#" onclick="verTablaErrores(); closeSubmenus()">Reporte de Errores</a>
+            <a href="#" onclick="verArbolSintactico(); closeSubmenus()">Árbol de análisis sintáctico</a>
+            <a href="#" onclick="verTablaSimbolos(); closeSubmenus()">Reporte de tabla de símbolos</a>
+        </div>
+    </div>
+    <div class="container">
+        <div class="panel">
+            <h2>Entrada</h2>
+            <div class="textarea-container">
+                <textarea id="entrada"></textarea>
+            </div>
+            <div class="line-count" id="line-count-entrada">Líneas: 1</div>
+        </div>
+        <div class="panel">
+            <h2>Consola</h2>
+            <div class="textarea-container">
+                <textarea id="consola" class="readonly" readonly></textarea>
+            </div>
+            <div class="line-count" id="line-count-consola">Líneas: 1</div>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/go/go.min.js"></script>
+    <script>
+        let editorEntrada, editorConsola;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            editorEntrada = CodeMirror.fromTextArea(document.getElementById('entrada'), {
+                mode: 'go',
+                theme: 'midnight',
+                lineNumbers: true
+            });
+            editorConsola = CodeMirror.fromTextArea(document.getElementById('consola'), {
+                mode: 'text/plain',
+                theme: 'monokai',
+                readOnly: true,
+                lineNumbers: true
+            });
+
+            editorEntrada.on('change', () => countLines(editorEntrada, 'line-count-entrada'));
+            editorConsola.on('change', () => countLines(editorConsola, 'line-count-consola'));
+
+            countLines(editorEntrada, 'line-count-entrada');
+            countLines(editorConsola, 'line-count-consola');
+        });
+
+        function toggleSubmenu(event, id) {
+            event.preventDefault();
+            const submenu = document.getElementById(id);
+            const isActive = submenu.style.display === 'block';
+            document.querySelectorAll('.submenu').forEach(sub => sub.style.display = 'none');
+            submenu.style.display = isActive ? 'none' : 'block';
+        }
+
+        function closeSubmenus() {
+            document.querySelectorAll('.submenu').forEach(sub => sub.style.display = 'none');
+        }
+
+        function nuevoArchivo() {
+            editorEntrada.setValue('');
+            countLines(editorEntrada, 'line-count-entrada');
+        }
+
+        function abrirArchivos() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.glt';
+            input.multiple = true;
+            input.onchange = function(event) {
+                const files = event.target.files;
+                for (let i = 0; i < files.length; i++) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        editorEntrada.setValue(editorEntrada.getValue() + e.target.result + '\n');
+                        countLines(editorEntrada, 'line-count-entrada');
+                    };
+                    reader.readAsText(files[i]);
+                }
+            };
+            input.click();
+        }
+
+        async function guardarArchivo() {
+            const entrada = editorEntrada.getValue();
+            if (window.showSaveFilePicker) {
+                const options = {
+                    types: [{
+                        description: 'CI Files',
+                        accept: {'text/plain': ['.glt']}
+                    }]
+                };
+                try {
+                    const fileHandle = await window.showSaveFilePicker(options);
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(entrada);
+                    await writable.close();
+                } catch (err) {
+                    console.error('Error saving file:', err);
+                }
+            } else {
+                // Opción de caída: usar Blob y enlace
+                const blob = new Blob([entrada], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'archivo.glt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        async function executeCode() {
+            /*const textoEntrada = editorEntrada.getValue();
+
+            try {
+                const response = await fetch('/Entrada', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: textoEntrada
+                });
+
+                const result = await response.text();  // Leer la respuesta del backend
+                console.log('Respuesta del servidor:', result);
+                editorConsola.setValue(result);  // Mostrar la respuesta en la consola
+            } catch (error) {
+                console.error('Error al enviar los datos:', error);
+                editorConsola.setValue('Error al ejecutar el código');
+            }*/
+            try {
+                const codigo = editorEntrada.getValue();
+                const response = await fetch('/Compile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ Code: codigo })
+                });
+        
+                const resultado = await response.text();
+                editorConsola.setValue(resultado);
+            } catch (error) {
+                console.error('Error:', error);
+                editorConsola.setValue('Error al enviar la solicitud: ' + error);
+            }
+        }
+
+        // Ver tabla de símbolos
+        async function verTablaSimbolos() {
+            /*try {
+                const response = await fetch('/tabladetokens', {
+                    method: 'GET',
+                    headers: {
+                    'Content-Type': 'text/plain' // Especifica el tipo de contenido
+                },
+            });
+
+                const result = await response.text(); // Lee la respuesta del servidor
+                console.log('Respuesta del servidor:', result);
+                // Abre la tabla de símbolos en una nueva ventana del navegador
+                window.open('/tabladetokens', '_blank');
+            } catch (error) {
+                console.error('Error al enviar los datos:', error);
+                editorConsola.setValue('Error al generar la tabla de símbolos'); // Muestra un mensaje de error
+            }*/
+                try {
+                // Primero ejecutar el código actual para actualizar los símbolos
+                await executeCode();
+                    
+                // Luego abrir la tabla de símbolos
+                const popup = window.open('', '_blank', 'width=800,height=600');
+                popup.document.write('<html><head><title>Cargando...</title></head><body><p>Cargando tabla de símbolos...</p></body></html>');
+                    
+                const response = await fetch('/tablasimbolos');
+                const htmlContent = await response.text();
+                    
+                popup.document.open();
+                popup.document.write(htmlContent);
+                popup.document.close();
+            } catch (error) {
+                console.error('Error al solicitar la tabla de símbolos:', error);
+                editorConsola.setValue('Error al solicitar la tabla de símbolos');
+            }
+        }
+
+        // Ver tabla de errores
+        async function verTablaErrores() {
+            
+            try {
+                // Crear una ventana popup
+                const popup = window.open('', '_blank', 'width=800,height=600');
+        
+                // Mientras se carga el contenido, mostrar un mensaje de carga
+                popup.document.write('<html><head><title>Cargando...</title></head><body><p>Cargando reporte de errores...</p></body></html>');
+        
+                // Hacer la solicitud al endpoint
+                const response = await fetch('/tablaerror');
+                const htmlContent = await response.text();
+        
+                // Una vez que tenemos el contenido, actualizar el popup
+                popup.document.open();
+                popup.document.write(htmlContent);
+                popup.document.close();
+        
+            } catch (error) {
+                console.error('Error al solicitar el reporte de errores:', error);
+                editorConsola.setValue('Error al solicitar el reporte de errores');
+            }
+        }
+
+        // Ver árbol de análisis sintáctico
+        async function verArbolSintactico() {
+            try {
+                const popup = window.open('', 'ASTWindow', 'width=1000,height=800,scrollbars=yes');
+                popup.document.write('<html><head><title>Cargando...</title><style>body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background-color:#f4f4f9;}</style></head><body><p>Generando árbol de análisis sintáctico...</p></body></html>');
+        
+                const response = await fetch('/ast', {
+                    method: 'GET' 
+                });
+        
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta del servidor: ' + response.status);
+                }
+        
+                const htmlContent = await response.text();
+        
+                popup.document.open();
+                popup.document.write(htmlContent);
+                popup.document.close();
+        
+                popup.focus();
+        
+            } catch (error) {
+                console.error('Error al solicitar el árbol de análisis sintáctico:', error);
+                editorConsola.setValue('Error al solicitar el árbol de análisis sintáctico: ' + error.message);
+            }
+        }
+        
+        function countLines(editor, lineCountId) {
+            const lineCount = editor.lineCount();
+            document.getElementById(lineCountId).innerText = `Líneas: ${lineCount}`;
+        }
+
+        function changeTheme(editor, theme) {
+            editor.setOption('theme', theme);
+        }
+        
+    </script>
+</body>
+</html>
