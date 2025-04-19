@@ -100,7 +100,7 @@ namespace Proyecto_2.Controllers
 
                 //Solo para debuggear!!
                 // Realizar el análisis sintáctico
-                //resultado.AppendLine("\n=== ANÁLISIS SINTÁCTICO ===");
+                resultado.AppendLine("\n=== ANÁLISIS SINTÁCTICO ===");
                 GolightParser.ProgramContext tree = parser.program();
 
                 if (errorListener.HasErrors) {
