@@ -20,7 +20,7 @@ public class StrconvAtoiEmbeded : Invocable
         return 1;
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         if (args.Count != 1)
             throw new SemanticError($"strconv.Atoi espera 1 argumento y obtuvo {args.Count}", null);
@@ -59,7 +59,7 @@ public class StrconvParseFloatEmbeded : Invocable
         return 1;
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         if (args.Count != 1)
             throw new SemanticError($"strconv.ParseFloat espera 1 argumento, obtuvo {args.Count}", null);
@@ -83,7 +83,7 @@ public class ReflectTypeofEmbeded : Invocable
         return 1;
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         if (args.Count != 1)
             throw new SemanticError($"reflect.TypeOf espera 1 argumento, obtuvo {args.Count}", null);
@@ -136,7 +136,7 @@ public class SlicesIndexEmbeded : Invocable
         return 2;
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         if (args.Count != 2)
             throw new SemanticError($"slices.Index espera 2 argumentos, se obtuvo {args.Count}", null);
@@ -169,7 +169,7 @@ public class StringsJoinEmbeded : Invocable
         return 2;
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         if (args.Count != 2)
             throw new SemanticError($"strings.Join espera 2 argumentos, se obtuvo {args.Count}", null);
@@ -206,7 +206,7 @@ public class LenEmbeded : Invocable
         return 1;
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         if (args.Count != 1)
             throw new SemanticError($"len espera 1 argumento, se obtuvo {args.Count}", null);
@@ -231,7 +231,7 @@ public class AppendEmbeded : Invocable
         return 2; // Acepta al menos 2 argumentos (el slicey el elemento a añadir)
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         if (args.Count < 2)
             throw new SemanticError($"Append espera 2 argumentos, se obtuvo {args.Count}", null);

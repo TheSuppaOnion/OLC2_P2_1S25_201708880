@@ -100,7 +100,7 @@ namespace Proyecto_2.Controllers
 
                 //Solo para debuggear!!
                 // Realizar el análisis sintáctico
-                resultado.AppendLine("\n=== ANÁLISIS SINTÁCTICO ===");
+                //resultado.AppendLine("\n=== ANÁLISIS SINTÁCTICO ===");
                 GolightParser.ProgramContext tree = parser.program();
 
                 if (errorListener.HasErrors) {
@@ -124,16 +124,19 @@ namespace Proyecto_2.Controllers
                     
                     try {
                         // Crear y ejecutar el visitor
-                        var visitor = new CompilerVisitor();
-                        visitor.Visit(tree);
+                        var semantico = new SemanticVisitor();
+                        semantico.Visit(tree);
                         
                         // Recolectar símbolos y guardarlos para la tabla de símbolos
-                        simbolos = visitor.currentEnvironment.GetAllSymbols();
+                        simbolos = semantico.currentEnvironment.GetAllSymbols();
+                        //outputEjecucion = semantico.output;
 
-                        outputEjecucion = visitor.output;
+                        //Generacion de Assembler ARM64
+                        var compiler = new CompilerVisitor(semantico.currentEnvironment);
+                        compiler.Visit(tree);
+                        outputEjecucion = compiler.c.ToString();
                         //Solo para debuggear!!
-                        //resultado.AppendLine("Ejecución completada exitosamente.");
-                        //resultado.AppendLine("=== RESULTADO ===");
+                        //resultado.AppendLine("//Compilación completada exitosamente.");
                         resultado.AppendLine(outputEjecucion);
                     } 
                     catch (SemanticError se) {

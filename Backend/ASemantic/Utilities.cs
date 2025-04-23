@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using Antlr4.Runtime;
 using analyzer;
-using static CompilerVisitor;
+using static SemanticVisitor;
 
 public static class Utilities
 {
@@ -228,7 +228,7 @@ public static class Utilities
     }
 
     //lista_valores
-    public static List<ValueWrapper> ProcessListaValores(GolightParser.Lista_valoresContext context, CompilerVisitor visitor)
+    public static List<ValueWrapper> ProcessListaValores(GolightParser.Lista_valoresContext context, SemanticVisitor visitor)
     {
         List<ValueWrapper> valores = new List<ValueWrapper>();
 

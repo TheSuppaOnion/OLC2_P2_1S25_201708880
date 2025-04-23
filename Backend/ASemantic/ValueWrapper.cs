@@ -19,7 +19,7 @@ public record FunctionValue(Invocable invocable, string name) : ValueWrapper
         return invocable.Arity();
     }
 
-    public ValueWrapper Call(List<ValueWrapper> arguments, CompilerVisitor visitor)
+    public ValueWrapper Call(List<ValueWrapper> arguments, SemanticVisitor visitor)
     {
         return function.Invoke(arguments, visitor);
         

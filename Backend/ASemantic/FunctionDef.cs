@@ -27,7 +27,7 @@ public class FunctionDefinition : Invocable
         return Parameters.Count;
     }
 
-    public ValueWrapper Invoke(List<ValueWrapper> args, CompilerVisitor visitor)
+    public ValueWrapper Invoke(List<ValueWrapper> args, SemanticVisitor visitor)
     {
         Environment functionEnv = new Environment(DeclarationEnvironment, Name);
         Environment previousEnv = visitor.currentEnvironment;
