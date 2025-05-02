@@ -3,22 +3,11 @@ func main() {
 	puntos := 0
 
 	fmt.Println("=== Archivo de prueba de funcionalidades intermedias ===")
+	fmt.Println("Validaciones manuales esperadas: 4")
 
 	// 1. Manejo de entornos (3 puntos)
 	fmt.Println("==== Manejo de entornos ====")
 	puntosEntornos := 0
-
-	fmt.Println("Variable redeclarada en el mismo entorno")
-	a := 10
-	// var a int = 20 // ! ERROR: Comentar esta línea para que el programa compile
-	fmt.Println("a =", a)
-
-	if a == 10 {
-		puntosEntornos = puntosEntornos + 1
-		fmt.Println("OK Detección de redeclaración en mismo entorno: correcto")
-	} else {
-		fmt.Println("X Detección de redeclaración en mismo entorno: incorrecto")
-	}
 
 	fmt.Println("\nVariable redeclarada en un entorno diferente")
 	b := 10
@@ -28,7 +17,7 @@ func main() {
 		fmt.Println("b dentro del if =", b)
 
 		if b == 20 {
-			puntosEntornos = puntosEntornos + 1
+			puntosEntornos = puntosEntornos + 2
 			fmt.Println("OK Redeclaración en entorno diferente: correcto")
 		} else {
 			fmt.Println("X Redeclaración en entorno diferente: incorrecto")
@@ -65,6 +54,7 @@ func main() {
 	fmt.Println("\n==== If / Else ====")
 	puntosIfElse := 0
 
+	fmt.Println("\n\n###Validacion Manual")
 	fmt.Println("If simple")
 	if true {
 		fmt.Println("Condición verdadera")
@@ -102,8 +92,9 @@ func main() {
 	} else {
 		fmt.Println("Ninguna condición verdadera")
 	}
+	fmt.Println("")
 
-	// 3. For Tipo While (2 puntos)
+	// 3. For Tipo While (4 puntos)
 	fmt.Println("\n==== For Tipo While ====")
 	puntosForWhile := 0
 
@@ -123,8 +114,24 @@ func main() {
 		fmt.Println("X For como while simple: incorrecto")
 	}
 
+	fmt.Println("\nFor como while con condición compuesta")
+	j := 0
+	producto := 1
+	for j < 5 && producto < 50 {
+		j = j + 1
+		producto = producto * j
+		fmt.Println("j =", j, "producto =", producto)
+	}
+
+	if j == 5 && producto == 120 {
+		puntosForWhile = puntosForWhile + 1
+		fmt.Println("OK For como while con condición compuesta: correcto")
+	} else {
+		fmt.Println("X For como while con condición compuesta: incorrecto")
+	}
+
 	fmt.Println("\nFor como while anidado (patrón X)")
-	fmt.Println("###Validacion Manual")
+	fmt.Println("\n\n###Validacion Manual")
 
 	n := 5
 	x := 0
@@ -144,9 +151,10 @@ func main() {
 		fmt.Println(fila)
 		x = x + 1
 	}
+	fmt.Println("")
 
 	if x == 5 {
-		puntosForWhile = puntosForWhile + 1
+		puntosForWhile = puntosForWhile + 2
 		fmt.Println("OK For como while anidado: correcto")
 	} else {
 		fmt.Println("X For como while anidado: incorrecto")
@@ -171,14 +179,17 @@ func main() {
 	}
 
 	fmt.Println("\nFor clásico anidado (tabla de multiplicar)")
-	fmt.Println("###Validacion Manual")
+	fmt.Println("\n\n###Validacion Manual")
 	for i := 1; i <= 3; i++ {
 		for j := 1; j <= 3; j++ {
 			fmt.Println(i, "x", j, "=", i*j)
 		}
 		fmt.Println()
 	}
+	fmt.Println("")
+
 	puntosForClasico = puntosForClasico + 2
+	fmt.Println("OK For clásico anidado: correcto")
 
 	// 5. For Range (3 puntos)
 	fmt.Println("\n==== For Range ====")
@@ -213,6 +224,7 @@ func main() {
 	fmt.Println("\n==== Switch/Case ====")
 	puntosSwitch := 0
 
+	fmt.Println("\n\n###Validacion Manual")
 	fmt.Println("Switch simple")
 	dia := 1
 
@@ -246,10 +258,10 @@ func main() {
 		fmt.Println("No se debería imprimir")
 	default:
 		fmt.Println("Número no reconocido, se ejecuta default")
-		puntosSwitch = puntosSwitch + 1 // Se suma solo si default se ejecuta correctamente
+		puntosSwitch = puntosSwitch + 1
 	}
 
-	fmt.Println("\n==== Switch con break explícito ====")
+	fmt.Println("\nSwitch con break explícito")
 
 	numeroBreak := 2
 
@@ -265,6 +277,7 @@ func main() {
 	case 3:
 		fmt.Println("No se debería imprimir")
 	}
+	fmt.Println("")
 
 	// 7. Break (3 puntos)
 	fmt.Println("\n==== Break ====")
@@ -361,23 +374,19 @@ func main() {
 	puntos = puntosEntornos + puntosIfElse + puntosForWhile + puntosForClasico +
 		puntosForRange + puntosSwitch + puntosBreak + puntosContinue
 
-	fmt.Println("\n=== Errores ===")
-	fmt.Println("###Validacion Manual")
-	fmt.Println("Errores esperados ?/1")
-
 	fmt.Println("\n=== Tabla de Resultados ===")
 	fmt.Println("+--------------------------+--------+-------+")
 	fmt.Println("| Característica           | Puntos | Total |")
 	fmt.Println("+--------------------------+--------+-------+")
 	fmt.Println("| Manejo de entornos       | ", puntosEntornos, "    | 3     |")
 	fmt.Println("| If / Else                | ", puntosIfElse, "    | 3     |")
-	fmt.Println("| For Tipo While           | ", puntosForWhile, "    | 2     |")
+	fmt.Println("| For Tipo While           | ", puntosForWhile, "    | 4     |")
 	fmt.Println("| For Clásico              | ", puntosForClasico, "    | 3     |")
 	fmt.Println("| For Range                | ", puntosForRange, "    | 3     |")
 	fmt.Println("| Switch/Case              | ", puntosSwitch, "    | 3     |")
 	fmt.Println("| Break                    | ", puntosBreak, "    | 3     |")
 	fmt.Println("| Continue                 | ", puntosContinue, "    | 3     |")
 	fmt.Println("+--------------------------+--------+-------+")
-	fmt.Println("| TOTAL                    | ", puntos, "   | 23    |")
+	fmt.Println("| TOTAL                    | ", puntos, "   | 25    |")
 	fmt.Println("+--------------------------+--------+-------+")
 }

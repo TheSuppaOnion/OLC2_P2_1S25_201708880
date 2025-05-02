@@ -27,12 +27,14 @@ func factorial(n int) int {
 	return n * factorial(n-1)
 }
 
-// Función recursiva: fibonacci
-func fibonacci(n int) int {
-	if n <= 1 {
-		return n
+func ackermann(m int, n int) int {
+	if m == 0 {
+		return n + 1
+	} else if m > 0 && n == 0 {
+		return ackermann(m-1, 1)
+	} else {
+		return ackermann(m-1, ackermann(m, n-1))
 	}
-	return fibonacci(n-1) + fibonacci(n-2)
 }
 
 // Función recursiva: torres de Hanoi
@@ -52,12 +54,12 @@ func main() {
 
 	fmt.Println("=== Archivo de prueba de funciones ===")
 
-	// 1. Funciones no recursivas sin parámetros (1 punto)
+	// 1. Funciones no recursivas sin parámetros (5 punto)
 	fmt.Println("==== Funciones no recursivas sin parámetros ====")
 	puntosFuncionesSimples := 0
 
 	fmt.Println("Función sin retorno:")
-	fmt.Println("###Validacion Manual")
+	fmt.Println("\n\n###Validacion Manual")
 	saludar()
 
 	fmt.Println("\nFunción con retorno:")
@@ -65,18 +67,18 @@ func main() {
 	fmt.Println("El número obtenido es:", numero)
 
 	if numero == 42 {
-		puntosFuncionesSimples = puntosFuncionesSimples + 1
+		puntosFuncionesSimples = puntosFuncionesSimples + 5
 		fmt.Println("OK Funciones no recursivas sin parámetros: correcto")
 	} else {
 		fmt.Println("X Funciones no recursivas sin parámetros: incorrecto")
 	}
 
-	// 2. Funciones no recursivas con parámetros (2 puntos)
+	// 2. Funciones no recursivas con parámetros (5 puntos)
 	fmt.Println("\n==== Funciones no recursivas con parámetros ====")
 	puntosFuncionesParametros := 0
 
 	fmt.Println("Función con parámetros sin retorno:")
-	fmt.Println("###Validacion Manual")
+	fmt.Println("\n\n###Validacion Manual")
 	saludarPersona("Juan")
 
 	fmt.Println("\nFunción con parámetros y retorno:")
@@ -84,13 +86,13 @@ func main() {
 	fmt.Println("La suma de 10 y 20 es:", resultadoSuma)
 
 	if resultadoSuma == 30 {
-		puntosFuncionesParametros = puntosFuncionesParametros + 2
+		puntosFuncionesParametros = puntosFuncionesParametros + 5
 		fmt.Println("OK Función con parámetros y retorno: correcto")
 	} else {
 		fmt.Println("X Función con parámetros y retorno: incorrecto")
 	}
 
-	// 3. Funciones recursivas (6 puntos)
+	// 3. Funciones recursivas (10 puntos)
 	fmt.Println("\n==== Funciones recursivas ====")
 	puntosFuncionesRecursivas := 0
 
@@ -99,29 +101,29 @@ func main() {
 	fmt.Println("Factorial de 5:", resultadoFactorial)
 
 	if resultadoFactorial == 120 {
-		puntosFuncionesRecursivas = puntosFuncionesRecursivas + 2
+		puntosFuncionesRecursivas = puntosFuncionesRecursivas + 3
 		fmt.Println("OK Función factorial: correcto")
 	} else {
 		fmt.Println("X Función factorial: incorrecto")
 	}
 
-	fmt.Println("\nFibonacci:")
-	resultadoFibonacci := fibonacci(10)
-	fmt.Println("Fibonacci de 10:", resultadoFibonacci)
+	fmt.Println("\nTorres de Hanoi:")
+	fmt.Println("\n\n###Validacion Manual")
+	hanoi(3, "A", "B", "C")
+	puntosFuncionesRecursivas = puntosFuncionesRecursivas + 3
 
-	if resultadoFibonacci == 55 {
-		puntosFuncionesRecursivas = puntosFuncionesRecursivas + 2
-		fmt.Println("OK Función fibonacci: correcto")
+	fmt.Println("\nAckermann:")
+	resultadoAckermann := ackermann(3, 2)
+	fmt.Println("Ackermann de (3, 2):", resultadoAckermann)
+
+	if resultadoAckermann == 29 {
+		puntosFuncionesRecursivas = puntosFuncionesRecursivas + 4
+		fmt.Println("OK Función ackermann: correcto")
 	} else {
-		fmt.Println("X Función fibonacci: incorrecto")
+		fmt.Println("X Función ackermann: incorrecto")
 	}
 
-	fmt.Println("\nTorres de Hanoi:")
-	fmt.Println("###Validacion Manual")
-	hanoi(3, "A", "B", "C")
-	puntosFuncionesRecursivas = puntosFuncionesRecursivas + 2
-
-	// 4. strconv.Atoi (1 punto)
+	// 4. strconv.Atoi (2 punto)
 	fmt.Println("\n==== strconv.Atoi ====")
 	puntosAtoi := 0
 
@@ -129,20 +131,14 @@ func main() {
 	numeroEntero := strconv.Atoi("123")
 	fmt.Println("\"123\" convertido a int:", numeroEntero)
 
-	// Intentar convertir un número decimal (debe fallar)
-	// numeroDecimalError := strconv.Atoi("123.45") // ! ERROR: Comentar esta línea para que el programa compile
-
-	// Intentar convertir texto no numérico (debe fallar)
-	// numeroTextoError := strconv.Atoi("abc") // ! ERROR: Comentar esta línea para que el programa compile
-
 	if numeroEntero == 123 {
-		puntosAtoi = puntosAtoi + 1
+		puntosAtoi = puntosAtoi + 2
 		fmt.Println("OK strconv.Atoi: correcto")
 	} else {
 		fmt.Println("X strconv.Atoi: incorrecto")
 	}
 
-	// 5. strconv.ParseFloat (1 punto)
+	// 5. strconv.ParseFloat (2 punto)
 	fmt.Println("\n==== strconv.ParseFloat ====")
 	puntosParseFloat := 0
 
@@ -154,11 +150,8 @@ func main() {
 	numeroDecimal2 := strconv.ParseFloat("123")
 	fmt.Println("\"123\" convertido a float64:", numeroDecimal2)
 
-	// Intentar convertir texto no numérico (debe fallar)
-	// numeroTextoErrorFloat := strconv.ParseFloat("abc") // ! ERROR: Comentar esta línea para que el programa compile
-
 	if numeroDecimal1 == 123.45 && numeroDecimal2 == 123.0 {
-		puntosParseFloat = puntosParseFloat + 1
+		puntosParseFloat = puntosParseFloat + 2
 		fmt.Println("OK strconv.ParseFloat: correcto")
 	} else {
 		fmt.Println("X strconv.ParseFloat: incorrecto")
@@ -208,21 +201,17 @@ func main() {
 	puntos = puntosFuncionesSimples + puntosFuncionesParametros + puntosFuncionesRecursivas +
 		puntosAtoi + puntosParseFloat + puntosTypeOf
 
-	fmt.Println("\n=== Errores ===")
-	fmt.Println("###Validacion Manual")
-	fmt.Println("Errores esperados ?/3")
-
 	fmt.Println("\n=== Tabla de Resultados ===")
 	fmt.Println("+----------------------------------+--------+-------+")
 	fmt.Println("| Característica                   | Puntos | Total |")
 	fmt.Println("+----------------------------------+--------+-------+")
-	fmt.Println("| Funciones sin parámetros         | ", puntosFuncionesSimples, "    | 1     |")
-	fmt.Println("| Funciones con parámetros         | ", puntosFuncionesParametros, "    | 2     |")
-	fmt.Println("| Funciones recursivas             | ", puntosFuncionesRecursivas, "    | 6     |")
-	fmt.Println("| strconv.Atoi                     | ", puntosAtoi, "    | 1     |")
-	fmt.Println("| strconv.ParseFloat               | ", puntosParseFloat, "    | 1     |")
+	fmt.Println("| Funciones sin parámetros         | ", puntosFuncionesSimples, "    | 5     |")
+	fmt.Println("| Funciones con parámetros         | ", puntosFuncionesParametros, "    | 5     |")
+	fmt.Println("| Funciones recursivas             | ", puntosFuncionesRecursivas, "   | 10    |")
+	fmt.Println("| strconv.Atoi                     | ", puntosAtoi, "    | 2     |")
+	fmt.Println("| strconv.ParseFloat               | ", puntosParseFloat, "    | 2     |")
 	fmt.Println("| reflect.TypeOf                   | ", puntosTypeOf, "    | 1     |")
 	fmt.Println("+----------------------------------+--------+-------+")
-	fmt.Println("| TOTAL                            | ", puntos, "   | 12    |")
+	fmt.Println("| TOTAL                            | ", puntos, "   | 25    |")
 	fmt.Println("+----------------------------------+--------+-------+")
 }

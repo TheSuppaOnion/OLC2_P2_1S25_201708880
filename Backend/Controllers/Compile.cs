@@ -132,7 +132,7 @@ namespace Proyecto_2.Controllers
                         //outputEjecucion = semantico.output;
 
                         //Generacion de Assembler ARM64
-                        var compiler = new CompilerVisitor(semantico.currentEnvironment);
+                        var compiler = new CompilerVisitor(semantico);
                         compiler.Visit(tree);
                         outputEjecucion = compiler.c.ToString();
                         //Solo para debuggear!!

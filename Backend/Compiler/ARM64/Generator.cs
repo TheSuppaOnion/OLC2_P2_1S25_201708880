@@ -5,16 +5,10 @@ public class ARM64Generator
     private readonly List<string> _instructions = new List<string>();
     private readonly StandardLibrary _standardLibrary = new StandardLibrary();
     private readonly Dictionary<string, string> _stringConstants = new Dictionary<string, string>();
+    private readonly Dictionary<string, int> _variableOffsets = new Dictionary<string, int>();
+    private readonly Dictionary<string,string> _stringLiteralMap = new Dictionary<string,string>();
     private int _stringConstantCounter = 0;
-    public string RegisterStringConstant(string value)
-    {
-        if (!_stringConstants.ContainsKey(value))
-        {
-            string label = $"string_constant_{_stringConstantCounter++}";
-            _stringConstants[value] = label;
-        }
-        return _stringConstants[value];
-    }
+    private int _currentStackOffset = 0;
     public void EmitLabel(string label)
     {
         _instructions.Add($"{label}:");
@@ -22,12 +16,8 @@ public class ARM64Generator
 
     public void EmitFunctionProlog()
     {
-        // Guardar registros de enlace y frame pointer
-        _instructions.Add("stp x29, x30, [sp, #-16]!");
-        _instructions.Add("mov x29, sp");
-
-        // Reservar espacio para variables locales si es necesario
-        // _instructions.Add("sub sp, sp, #N");  // Donde N es el espacio necesario
+        // Reserva 128 bytes para todas las variables locales
+        _instructions.Add("sub sp, sp, #128");
     }
 
     public void EmitFunctionEpilog()
@@ -39,6 +29,60 @@ public class ARM64Generator
         _instructions.Add("ldp x29, x30, [sp], #16");
     }
 
+    public void AllocateSlice(string id, string tipo, int count)
+{
+    Comment($"Creando slice '{id}' de tipo {tipo} y {count} elementos");
+    
+    int sizeByte = 8;  
+    int totalSize = count * sizeByte;
+    
+    Mov(Register.X0, totalSize);
+    Bl("malloc");
+    
+    
+    StoreVariable(id);
+    
+    for (int i = count - 1; i >= 0; i--)
+    {
+        Pop(Register.X1);
+        Comment($"Guardando elemento {i} en slice '{id}'");
+        Str(Register.X1, Register.X0, i * sizeByte);
+    }
+}
+
+public void AllocateVariable(string varName)
+{
+    // Asignar un nuevo offset para la variable (16 bytes alineados)
+    _currentStackOffset += 16;
+    _variableOffsets[varName] = _currentStackOffset;
+}
+
+    public void StoreVariable(string name)
+    {
+        int offset = _variableOffsets[name];
+        _instructions.Add($"// Guardando valor en variable {name} en offset {offset}");
+        _instructions.Add($"str x0, [x29, #{offset}]");
+    }
+
+ public void LoadVariable(string register, string name)
+{
+    if (_variableOffsets.TryGetValue(name, out int offset))
+    {
+        _instructions.Add($"// Cargando {name} desde [x29+{offset}]");
+        _instructions.Add($"ldr {register}, [x29, #{offset}]");
+    }
+    else
+    {
+        // tu fallback actual…
+        _instructions.Add($"mov {register}, #0  // {name} no definida");
+    }
+}
+
+    public bool HasVariable(string name)
+    {
+        return _variableOffsets.ContainsKey(name);
+    }
+
     public void Ret()
     {
         _instructions.Add("ret");
@@ -48,9 +92,17 @@ public class ARM64Generator
     {
         _instructions.Add($"add {rd}, {rs1}, {rs2}");
     }
+    public void Add(string rd, string rs1, int imm)
+    {
+        _instructions.Add($"add {rd}, {rs1}, #{imm}");
+    }
     public void Sub(string rd, string rs1, string rs2)
     {
         _instructions.Add($"sub {rd}, {rs1}, {rs2}");
+    }
+    public void Sub(string rd, string rs1, int imm)
+    {
+        _instructions.Add($"sub {rd}, {rs1}, #{imm}");
     }
     public void Mul(string rd, string rs1, string rs2)
     {
@@ -80,28 +132,123 @@ public class ARM64Generator
     {
         _instructions.Add($"mov {rd}, {rs}");
     }
-    public void LoadVariable(string register, string varName)
+
+    public void Movz(string rd, ulong value, int shift = 0)
+    {
+        _instructions.Add($"movz {rd}, #{value & 0xFFFF}, lsl #{shift}");
+    }
+    
+    public void Movk(string rd, ulong value, int shift = 0)
+    {
+        _instructions.Add($"movk {rd}, #{value & 0xFFFF}, lsl #{shift}");
+    }
+    
+    public void Fmov(string fd, string xn)
+    {
+        _instructions.Add($"fmov {fd}, {xn}");
+    }
+
+    public void FAdd(string fd, string fs1, string fs2)
+    {
+        _instructions.Add($"fadd {fd}, {fs1}, {fs2}");
+    }
+
+    public void FMul(string fd, string fs1, string fs2)
+    {
+        _instructions.Add($"fmul {fd}, {fs1}, {fs2}");
+    }
+    public void PushFloat()
+    {
+        _instructions.Add($"str d0, [sp, #-16]!");
+    }
+    
+    public void PopFloat()
+    {
+        _instructions.Add($"ldr d0, [sp], #16");
+    }
+
+    public void Csel(string rd, string rn, string rm, string condition)
+    {
+        _instructions.Add($"csel {rd}, {rn}, {rm}, {condition}");
+    }
+    
+public void StoreVariableFloat(string varName)
 {
-    _instructions.Add($"// Cargar variable {varName}");
-    _instructions.Add($"ldr {register}, [x29, #var_{varName}_offset]");
+    if (_variableOffsets.TryGetValue(varName, out int offset))
+    {
+        // offset medido desde el frame pointer x29, no desde sp
+        _instructions.Add($"str d0, [x29, #{offset}]");
+    }
+    else
+    {
+        throw new Exception($"Variable {varName} no definida");
+    }
 }
 
-    public void LoadStringVariable(string register, string varName)
+public void LoadVariableFloat(string varName)
+{
+    if (_variableOffsets.TryGetValue(varName, out int offset))
     {
-        _instructions.Add($"// Cargar dirección de cadena {varName}");
-        _instructions.Add($"adr {register}, str_{varName}");
+        // ldr d0, [x29, #offset]
+        _instructions.Add($"ldr d0, [x29, #{offset}]");
     }
+    else
+    {
+        throw new Exception($"Variable {varName} no definida");
+    }
+}
+
+
+    public void IntToFloat()
+    {
+        _instructions.Add($"scvtf d0, x0");
+    }
+
+public string RegisterFloat(double value)
+{
+    string label = $"float_{_stringConstantCounter++}";
+    _instructions.Add($".data");
+    _instructions.Add($"    .align 8");
+    _instructions.Add($"{label}:");
+    _instructions.Add($"    .double {value}");
+    _instructions.Add($".text");
+    return label;
+}
+
+public void LoadFloatValue(double value)
+{
+    string label = RegisterFloat(value);
+    _instructions.Add($"adr x0, {label}");
+    _instructions.Add($"ldr d0, [x0]");
+}
+
+    public void FSub(string fd, string fs1, string fs2)
+    {
+        _instructions.Add($"fsub {fd}, {fs1}, {fs2}");
+    }
+
+    public void FDiv(string fd, string fs1, string fs2)
+    {
+        _instructions.Add($"fdiv {fd}, {fs1}, {fs2}");
+    }
+
     public void Adr(string rd, string label)
     {
         _instructions.Add($"adr {rd}, {label}");
     }
     public string RegisterString(string value)
     {
+        // si ya existía esa cadena, retorno el mismo label
+        if (_stringLiteralMap.TryGetValue(value, out var lbl))
+            return lbl;
+
+        // si no, genero uno nuevo
         string label = $"str_const_{_stringConstants.Count}";
         _stringConstants[label] = value;
-        _stringConstantCounter++;
+        _stringLiteralMap[value] = label;
         return label;
     }
+
     public void Push(string reg)
     {
         _instructions.Add($"str {reg}, [sp, #-16]!");
@@ -115,16 +262,71 @@ public class ARM64Generator
         _instructions.Add($"bl {label}");
         _standardLibrary.Use(label);
     }
+    public void Beq(string label)
+    {
+        _instructions.Add($"beq {label}");
+    }
+    public void B(string label)
+    {
+        _instructions.Add($"b {label}");
+    }
+    public void Cset(string rd, string condition)
+    {
+        _instructions.Add($"cset {rd}, {condition}");
+    }
+    public void Fcmp(string fs1, string fs2)
+    {
+        _instructions.Add($"fcmp {fs1}, {fs2}");
+    }
+    public void AdrIfNotZero(string register, string label)
+{
+    _instructions.Add($"csel {register}, {register}, {label}, ne");
+}
+
+    public void Cmp(string register, int value)
+    {
+        _instructions.Add($"cmp {register}, #{value}");
+    }
+    public void Cmp(string register1, string register2)
+    {
+        _instructions.Add($"cmp {register1}, {register2}");
+    }
+    public void Orr(string rd, string rs1, string rs2)
+    {
+        _instructions.Add($"orr {rd}, {rs1}, {rs2}");
+    }
+    public void And(string rd, string rs1, string rs2)
+    {
+        _instructions.Add($"and {rd}, {rs1}, {rs2}");
+    }
+    public void Neg(string rd, string rs)
+    {
+        _instructions.Add($"neg {rd}, {rs}");
+    }
+    public void Eor(string rd, string rs1, int rs2)
+    {
+        _instructions.Add($"eor {rd}, {rs1}, #{rs2}");
+    }
+    public void Bne(string label)
+    {
+        _instructions.Add($"bne {label}");
+    }
+    public void Bge(string label)
+    {
+        _instructions.Add($"bge {label}");
+    }
     public void Svc()
     {
         _instructions.Add("svc #0");
     }
     public void EndProgram()
     {
+        // Devuelve SP y registros, luego llamada a exit
+        _instructions.Add("add sp, sp, #128");
         _instructions.Add("ldp x29, x30, [sp], #16");
-        Mov(Register.X0, 0);
-        Mov(Register.X8, 93); // syscall para salir
-        Svc();
+        _instructions.Add("mov x0, #0");
+        _instructions.Add("mov x8, #93");
+        _instructions.Add("svc #0");
     }
     public void PrintInteger(string rs)
     {
@@ -135,9 +337,14 @@ public class ARM64Generator
     public void PrintString(string value)
     {
         _standardLibrary.Use("print_string");
-        string label = RegisterStringConstant(value);
+        string label = RegisterString(value);
         _instructions.Add($"adr x0, {label}");
         _instructions.Add($"bl print_string");
+    }
+    public void PrintFloat()
+    {
+        _standardLibrary.Use("print_float");
+        _instructions.Add($"bl print_float"); // Llamar a la función
     }
     
     public void PrintNewLine()
@@ -149,50 +356,54 @@ public class ARM64Generator
     {
         _instructions.Add($"// {comment}");
     }
-    public override string ToString()
+    
+public override string ToString()
+{
+    var sb = new StringBuilder();
+    sb.AppendLine("// Generando código ARM64-201708880");
+    
+    // Sección .data
+    sb.AppendLine(".data");
+    
+    // Definir constantes de string
+    foreach (var stringConst in _stringConstants)
     {
-        var sb = new StringBuilder();
-
-        // Sección .data primero
-        sb.AppendLine(".data");
-
-        // Definir datos constantes necesarios
-        foreach (var stringConst in _stringConstants)
-        {
-            sb.AppendLine($"{stringConst.Key}: .asciz \"{stringConst.Value}\"");
-            sb.AppendLine("    .align 4");  // Alineación importante
-        }
-
-        // Definir otras constantes necesarias
-        sb.AppendLine("newline_char:");
-        sb.AppendLine("    .byte   10");    // ASCII code for newline character
-        sb.AppendLine("    .align  4");     // Alineación importante
-
-        // Luego la sección .text
-        sb.AppendLine();
-        sb.AppendLine(".text");
-        sb.AppendLine(".global _start");
-        sb.AppendLine("_start:");
-
-        // Configuración del frame pointer
-        sb.AppendLine("    // Configuración del frame");
-        sb.AppendLine("    stp x29, x30, [sp, #-16]!");
-        sb.AppendLine("    mov x29, sp");
-
-        // Instrucciones generadas
-        foreach (var instruction in _instructions)
-        {
-            // Si es una etiqueta, no aplicar indentación
-            if (instruction.EndsWith(":"))
-                sb.AppendLine(instruction);
-            else
-                sb.AppendLine("    " + instruction);
-        }
-
-        // Incluir las funciones de la biblioteca estándar
-        sb.AppendLine();
-        sb.AppendLine(_standardLibrary.GetFunctionDefinitions());
-
-        return sb.ToString();
+        // Escapar el newline correctamente
+        string value = stringConst.Value.Replace("\n", "\\n");
+        sb.AppendLine($"{stringConst.Key}:");
+        sb.AppendLine($"    .ascii \"{value}\"");
+        sb.AppendLine("    .align 4");  
     }
+
+    // Sección .text
+    sb.AppendLine("\n.text");
+    sb.AppendLine(".global _start");         
+    sb.AppendLine(".extern printf");       // Declarar printf como externo
+    
+    sb.AppendLine("_start:");                
+    
+    // Configuración del frame
+    sb.AppendLine("    stp x29, x30, [sp, #-16]!");
+    sb.AppendLine("    mov x29, sp");
+
+    // Instrucciones generadas
+    foreach (var instruction in _instructions)
+    {
+        if (instruction.EndsWith(":"))
+            sb.AppendLine(instruction);
+        else
+            sb.AppendLine("    " + instruction);
+    }
+
+    // Epilogo y retorno
+    sb.AppendLine("    mov w0, #0");      // Valor de retorno 0
+    sb.AppendLine("    ldp x29, x30, [sp], #16");
+    sb.AppendLine("    ret");             // Usar ret en lugar de svc
+
+    // Incluir las funciones de la biblioteca estándar que fueron usadas
+    sb.AppendLine("\n// Standard library functions");
+    sb.AppendLine(_standardLibrary.GetFunctionDefinitions());
+
+    return sb.ToString();
+}
 }

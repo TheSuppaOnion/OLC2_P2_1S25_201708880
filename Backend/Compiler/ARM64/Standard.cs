@@ -92,7 +92,7 @@ convert_loop:
     
     // Reverse the buffer since digits are in reverse order
     mov x27, #0                // Start index
-reverse_loop:
+print_integer_reverse:         // Renamed from reverse_loop
     sub x28, x23, x27          // x28 = length - current index
     sub x28, x28, #1           // x28 = length - current index - 1
     
@@ -106,14 +106,9 @@ reverse_loop:
     strb w24, [x22, x28]       // Store start character at end
     
     add x27, x27, #1           // Increment start index
-    b reverse_loop             // Continue reversing
+    b print_integer_reverse    // Changed from b reverse_loop
     
 print_result:
-    // Add newline
-    mov w24, #10               // Newline character
-    strb w24, [x22, x23]       // Add to end of buffer
-    add x23, x23, #1           // Increment counter
-    
     // Print the result
     mov x0, #1                 // fd = 1 (stdout)
     mov x1, x22                // Buffer address
@@ -293,25 +288,26 @@ concat_done:
 "},
 
 { "convert_int_to_string", @"
-//--------------------------------------------------------------
-// convert_int_to_string - Converts an integer to a string
-//
-// Input:
-//   x0 - The integer value to convert
-// Output:
-//   x0 - The address of the resulting string
-//--------------------------------------------------------------
+    //--------------------------------------------------------------
+    // convert_int_to_string - Converts an integer to a string
+    //
+    // Input:
+    //   x0 - The integer value to convert
+    // Output:
+    //   x0 - The address of the resulting string
+    //--------------------------------------------------------------
+    .align 4
 convert_int_to_string:
-    // Save registers
-    stp     x29, x30, [sp, #-16]!
-    stp     x19, x20, [sp, #-16]!
-    stp     x21, x22, [sp, #-16]!
-    stp     x23, x24, [sp, #-16]!
+    // Save registers (maintaining 16-byte alignment)
+    stp     x29, x30, [sp, #-32]!
+    stp     x19, x20, [sp, #16]
+    stp     x21, x22, [sp, #32]
+    stp     x23, x24, [sp, #48]
     
     // x19 will hold our integer
     mov     x19, x0
     
-    // Allocate space for string on stack (max 21 bytes for 64-bit int plus sign and null terminator)
+    // Allocate space for string on stack (32 bytes for alignment)
     sub     sp, sp, #32
     mov     x22, sp              // x22 points to buffer
     
@@ -320,26 +316,29 @@ convert_int_to_string:
     bge     convert_positive
     
     // Handle negative
-    mov     w20, #45             // ASCII for '-'
+    mov     w20, #'-'            // ASCII for '-'
     strb    w20, [x22]           // Store minus sign
     mov     x21, #1              // Start position after minus
     neg     x19, x19             // Make number positive
     b       begin_conversion
     
+    .align 4
 convert_positive:
     mov     x21, #0              // Start at beginning of buffer
     
+    .align 4
 begin_conversion:
     // Handle special case for zero
     cmp     x19, #0
     bne     conversion_loop
     
     // If number is zero, just use '0'
-    mov     w20, #48             // ASCII for '0'
+    mov     w20, #'0'            // ASCII for '0'
     strb    w20, [x22, x21]      // Store in buffer
     add     x21, x21, #1         // Increment position
     b       conversion_end
     
+    .align 4
 conversion_loop:
     // Continue until number becomes 0
     cmp     x19, #0
@@ -351,7 +350,7 @@ conversion_loop:
     msub    x20, x24, x23, x19   // x20 = x19 - (x24 * 10) = remainder
     
     // Convert digit to ASCII and store
-    add     w20, w20, #48        // Convert to ASCII
+    add     w20, w20, #'0'       // Convert to ASCII
     strb    w20, [x22, x21]      // Store in buffer
     add     x21, x21, #1         // Increment position
     
@@ -359,6 +358,7 @@ conversion_loop:
     mov     x19, x24
     b       conversion_loop
     
+    .align 4
 reverse_string:
     // x21 now contains the length of the string (excluding null terminator)
     
@@ -367,9 +367,11 @@ reverse_string:
     cmp     x23, #0
     bne     start_reversal       // If we have a minus sign, start after it
     
+    .align 4
 start_reversal:
     sub     x24, x21, #1         // End index (last character)
     
+    .align 4
 reverse_loop:
     cmp     x23, x24             // Check if indices have crossed
     bge     conversion_end
@@ -384,6 +386,7 @@ reverse_loop:
     sub     x24, x24, #1         // Decrement end index
     b       reverse_loop
     
+    .align 4
 conversion_end:
     // Add null terminator
     mov     w20, #0              // ASCII NUL
@@ -392,12 +395,11 @@ conversion_end:
     // Return buffer pointer
     mov     x0, x22
     
-    // Restore registers (we don't restore stack pointer to keep our string buffer)
-    ldp     x23, x24, [sp, #32]
-    ldp     x21, x22, [sp, #16]
-    ldp     x19, x20, [sp, #0]
-    // Note: We're keeping the allocated stack space since it contains our string
-    // This means the caller must be careful about stack usage
+    // Restore registers and stack pointer
+    ldp     x23, x24, [sp, #48]
+    ldp     x21, x22, [sp, #32]
+    ldp     x19, x20, [sp, #16]
+    ldp     x29, x30, [sp], #64  // Restore SP (32 for allocation + 32 for registers)
     
     ret
 "},
@@ -469,6 +471,170 @@ str_true:
     .asciz  ""true""
 str_false:
     .asciz  ""false""
+"},
+{ "print_bool", @"
+//--------------------------------------------------------------
+// print_bool - Prints a boolean value (true/false) to stdout
+//
+// Input:
+//   x0 - The boolean value (0 = false, non-zero = true)
+//--------------------------------------------------------------
+print_bool:
+    .align 4                    // Asegurar alineamiento
+    // Save registers
+    stp x29, x30, [sp, #-16]!
+    
+    // Check if value is 0 (false) or non-zero (true)
+    cmp x0, #0
+    
+    // Branch to appropriate section
+    beq print_false
+    
+print_true:
+    .align 4                    // Asegurar alineamiento
+    // Print 'true'
+    adr x1, bool_true_str
+    mov x2, #4                  // Length of 'true'
+    b print_bool_common
+    
+print_false:
+    .align 4                    // Asegurar alineamiento
+    // Print 'false'
+    adr x1, bool_false_str
+    mov x2, #5                  // Length of 'false'
+    
+print_bool_common:
+    .align 4                    // Asegurar alineamiento
+    // Print the string
+    mov x0, #1                  // stdout
+    mov x8, #64                 // write syscall
+    svc #0
+    
+    // Print newline
+    mov x0, #1                  // stdout
+    adr x1, bool_newline       // newline character
+    mov x2, #1                  // length = 1
+    mov x8, #64                 // write syscall
+    svc #0
+    
+    // Restore registers and return
+    ldp x29, x30, [sp], #16
+    ret
+
+    .align 4                    // Asegurar alineamiento
+bool_true_str:
+    .ascii ""true""
+    .align 4                    // Asegurar alineamiento
+bool_false_str:
+    .ascii ""false""
+    .align 4                    // Asegurar alineamiento
+bool_newline:
+    .ascii ""\n""
+    .align 4                    // Asegurar alineamiento
+"},
+{ "print_float", @"
+//--------------------------------------------------------------
+// print_float - Prints a floating-point value to stdout
+//--------------------------------------------------------------
+    .text
+    .align 4
+print_float:
+    // Save registers
+    stp x29, x30, [sp, #-16]!
+    stp x19, x20, [sp, #-16]!
+    stp x21, x22, [sp, #-16]!
+    stp d8, d9, [sp, #-16]!
+    
+    // Get integer part
+    fcvtzs x19, d0
+    
+    // Convert to string and print
+    mov x0, x19
+    bl print_integer
+    
+    // Print decimal point
+    mov x0, #1
+    adr x1, float_point
+    mov x2, #1
+    mov x8, #64
+    svc #0
+    
+    // Print 6 decimals
+    mov x23, #6
+    fmov d9, #10.0
+    
+    // Get decimal part
+    scvtf d8, x19        // Convertir parte entera a float
+    fsub d8, d0, d8      // d8 = valor original - parte entera
+    fabs d8, d8          // Asegurar que sea positivo
+    
+decimal_loop:
+    // Multiply by 10 to get next digit
+    fmul d8, d8, d9      // d8 = d8 * 10
+    
+    // Extract the digit
+    fcvtzs x0, d8        // Convertir a entero (solo el dígito actual)
+    scvtf d10, x0        // Convertir entero a float
+    fsub d8, d8, d10     // d8 = valor original - parte entera
+    
+    // Convertir dígito a ASCII
+    add x0, x0, #48      // Convertir a ASCII
+    
+    // Print the digit
+    strb w0, [sp, #-1]!
+    mov x0, #1
+    mov x1, sp
+    mov x2, #1
+    mov x8, #64
+    svc #0
+    add sp, sp, #1
+    
+    // Prepare for next decimal
+    fcvtzs x20, d8       // Obtener el dígito actual como entero
+    scvtf d10, x20       // Convertir el entero a float
+    fsub d8, d8, d10     // Restar para mantener solo la parte fraccionaria
+    
+    subs x23, x23, #1
+    bne decimal_loop
+    
+    // Restore registers
+    ldp d8, d9, [sp], #16
+    ldp x21, x22, [sp], #16
+    ldp x19, x20, [sp], #16
+    ldp x29, x30, [sp], #16
+    ret
+
+    .align 4
+float_point: .ascii "".""
+    .align 4
+"},
+{ "print_float_debug", @"
+//--------------------------------------------------------------
+// print_float_debug - Usa printf de C para imprimir un flotante
+//--------------------------------------------------------------
+    .text
+    .align 4
+print_float_debug:
+    // Save registers
+    stp x29, x30, [sp, #-16]!
+    
+    // Preparar printf
+    adrp x0, float_format        // Cargar parte alta de la dirección
+    add x0, x0, :lo12:float_format  // Cargar parte baja de la dirección
+    // El valor flotante ya está en d0
+    
+    // Llamar a printf (asume que está enlazado)
+    bl printf
+    
+    // Restore registers and return
+    ldp x29, x30, [sp], #16
+    ret
+
+    .section .rodata
+    .align 4
+float_format:
+    .asciz ""DEBUG: %.6f\n""
+    .text
 "}
     };
 }
