@@ -204,9 +204,9 @@ public void AllocateVariable(string varName)
     {
         _instructions.Add($"csel {rd}, {rn}, {rm}, {condition}");
     }
-    public void B(string label, string condition)
+    public void B(string cond, string label)
     {
-        _instructions.Add($"b{condition} {label}");
+        _instructions.Add($"b{cond} {label}");
     }
     
 public void StoreVariableFloat(string varName)

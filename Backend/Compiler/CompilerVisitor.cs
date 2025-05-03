@@ -437,7 +437,7 @@ public override Object? VisitPrint(GolightParser.PrintContext context)
             Visit(expr);
             string type = GetExpressionType(expr);
             // detectar slices (tipo "[]int", "[]string", etc.)
-            if (expr.GetText().StartsWith("[]"))
+            if (type=="slice")
             {
                 var value = currentEnvironment.GetVariable(txt, expr.Start);
                 var slice = (ArrayValue)value;
