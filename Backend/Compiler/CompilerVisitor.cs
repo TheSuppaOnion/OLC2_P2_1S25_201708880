@@ -1,6 +1,7 @@
 using System.Text;
 using analyzer;
 using Antlr4.Runtime;
+using Antlr4.Runtime.Tree;
 
 public class CompilerVisitor : GolightBaseVisitor<Object>
 {
@@ -10,6 +11,7 @@ public class CompilerVisitor : GolightBaseVisitor<Object>
     public Environment currentEnvironment; // Environment del ASemantic
     private int _ifCounter = 0;
     private int _logicCounter = 0;
+    private int _sliceCounter = 0;   
     private Stack<string> _breakLabels    = new Stack<string>();
     private Stack<string> _continueLabels = new Stack<string>();
 
@@ -63,11 +65,45 @@ public class CompilerVisitor : GolightBaseVisitor<Object>
             return null;
     }
 
-    //De los peores visitors en el sentido de orden, mucha debugeada y no estoy para ordenarlo ya que funciona como esta
-    public override Object? VisitSlices(GolightParser.SlicesContext context)
-    {   
-        return null;
+public override object? VisitSlices(GolightParser.SlicesContext ctx)
+{
+    string id   = ctx.ID().GetText();
+    var elems   = FlattenListaValores(ctx).Select(e => int.Parse(e.GetText())).ToArray();
+    int count   = elems.Length;
+    // 1) Registrar el array en .data
+    string label = c.RegisterIntSlice($"slice_{id}", elems);
+    // 2) Asignar espacio en el stack para la variable
+    c.AllocateVariable(id);
+    // 3) Cargar la dirección de datos en X0 y guardarla
+    c.Adr(Register.X0, label);
+    c.StoreVariable(id);
+    // 3) Solo actualizamos el wrapper que puso el semántico:
+    var wrapper = (ArrayValue)currentEnvironment
+                   .GetVariable(id, ctx.ID().Symbol);
+    wrapper.Label = label;      // para que EmitPrintSliceInt lo sepa
+    wrapper.Count = count;      // si el semántico no lo puso
+    wrapper.Name  = id;         // opcional: para usar en dinámicos
+    return null;
+}
+
+private List<GolightParser.ExpressionContext> FlattenListaValores(IParseTree node)
+{
+    var list = new List<GolightParser.ExpressionContext>();
+    // Si el nodo es una expresión, la agregamos
+    if (node is GolightParser.ExpressionContext expr)
+    {
+        list.Add(expr);
     }
+    // Recorremos recursivamente sus hijos
+    for (int i = 0; i < node.ChildCount; i++)
+    {
+        var child = node.GetChild(i);
+        // Si es una coma, la ignoramos (la usaremos solamente para separar)
+        if (child.GetText() == ",") continue;
+        list.AddRange(FlattenListaValores(child));
+    }
+    return list;
+}
 
 public override Object? VisitDeclaration(GolightParser.DeclarationContext context)
 {
@@ -395,11 +431,21 @@ public override Object? VisitPrint(GolightParser.PrintContext context)
             c.Adr(Register.X0, lbl);
             c.Bl("printf");
         }
-        else
+                else
         {
             // no literal: evaluamos/push
             Visit(expr);
             string type = GetExpressionType(expr);
+            // detectar slices (tipo "[]int", "[]string", etc.)
+            if (expr.GetText().StartsWith("[]"))
+            {
+                var value = currentEnvironment.GetVariable(txt, expr.Start);
+                var slice = (ArrayValue)value;
+                EmitPrintSliceInt(slice);
+                continue;
+            }
+            else
+            {
             c.Comment($"Imprimiendo valor de tipo: {type}");
             switch (type)
             {
@@ -456,6 +502,7 @@ public override Object? VisitPrint(GolightParser.PrintContext context)
                     c.Bl("printf");
                     break;
             }
+            }
         }
 
         // espacio entre args
@@ -473,6 +520,75 @@ public override Object? VisitPrint(GolightParser.PrintContext context)
     c.Bl("printf");
 
     return null;
+}
+
+private void EmitPrintSliceInt(ArrayValue slice)
+{
+    int id        = _sliceCounter++;
+    string loopLbl  = $"SLICE_LOOP_{id}";
+    string noSepLbl = $"SLICE_NOSEP_{id}";
+    string endLbl   = $"SLICE_END_{id}";
+    string sepFmt   = c.RegisterString(", ");
+    string openFmt  = c.RegisterString("[");
+    string closeFmt = c.RegisterString("]");
+
+    // preserve X1–X5
+    c.Push(Register.X1); c.Push(Register.X2);
+    c.Push(Register.X3); c.Push(Register.X4);
+    c.Push(Register.X5);
+
+    // X1 = ptr a datos
+    if (slice.Label != null)
+    {
+        // slice estático
+        c.Adr(Register.X1, slice.Label);
+    }
+    else
+    {
+        // slice dinámico: la variable en stack apunta al inicio
+        c.LoadVariable(Register.X1, slice.Name);
+    }
+
+    // X2 = count
+    c.Mov(Register.X2, slice.Count);
+
+    // print “[”
+    c.Adr(Register.X0, openFmt); c.Bl("printf");
+
+    // bucle i = 0 .. count-1
+    c.Mov(Register.X3, 0);
+    c.EmitLabel(loopLbl);
+    c.Cmp(Register.X3, Register.X2);
+    c.B("ge", endLbl);
+
+    // si i>0 => print “, ”
+    c.Cmp(Register.X3, 0);
+    c.B("eq", noSepLbl);
+    c.Adr(Register.X0, sepFmt); c.Bl("printf");
+    c.EmitLabel(noSepLbl);
+
+    // cargar w5 = *x1 (elemento 32‑bits)
+    c.Ldr("w5", Register.X1, 0);
+
+    // printf("%d", w5)
+    var intFmt = c.RegisterString("%d");
+    c.Adr(Register.X0, intFmt);
+    c.Mov("w1", "w5");
+    c.Bl("printf");
+
+    // avanzamos puntero e índice
+    c.Add(Register.X1, Register.X1, 4);
+    c.Add(Register.X3, Register.X3, 1);
+    c.B(loopLbl);
+
+    // fin bucle → print “]”
+    c.EmitLabel(endLbl);
+    c.Adr(Register.X0, closeFmt); c.Bl("printf");
+
+    // restore X5–X1
+    c.Pop(Register.X5); c.Pop(Register.X4);
+    c.Pop(Register.X3); c.Pop(Register.X2);
+    c.Pop(Register.X1);
 }
 
     public override Object? VisitConcatenacion(GolightParser.ConcatenacionContext context)
