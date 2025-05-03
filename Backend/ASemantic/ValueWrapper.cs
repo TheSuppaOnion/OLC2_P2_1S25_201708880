@@ -44,12 +44,22 @@ public record FunctionValue(Invocable invocable, string name) : ValueWrapper
 public record ArrayValue : ValueWrapper
 {
     public List<ValueWrapper> Elements { get; set; }
+    public string Name        { get; set;}
     public string ElementType { get; set; }
+    public int    Count       { get; set;}
+    public string Label       { get; set;} 
+
     
     public ArrayValue(List<ValueWrapper> elements, string elementType)
     {
         Elements = elements;
         ElementType = elementType;
+    }
+    public ArrayValue(string name, int count, string label)
+    {
+        Name        = name;
+        Count       = count;
+        Label       = label;
     }
     
     public override string ToString()

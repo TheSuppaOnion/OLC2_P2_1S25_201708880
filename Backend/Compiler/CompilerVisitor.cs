@@ -1,25 +1,21 @@
 using System.Text;
 using analyzer;
 using Antlr4.Runtime;
-using Antlr4.Runtime.Tree;
 
 public class CompilerVisitor : GolightBaseVisitor<Object>
 {
 
     public ARM64Generator c = new ARM64Generator();
     public ValueWrapper defaultVoid = new NillValue();
-    private readonly IReadOnlyDictionary<IParseTree, Environment> _envMap;
-    
     public Environment currentEnvironment; // Environment del ASemantic
     private int _ifCounter = 0;
     private int _logicCounter = 0;
     private Stack<string> _breakLabels    = new Stack<string>();
     private Stack<string> _continueLabels = new Stack<string>();
 
-    public CompilerVisitor(SemanticVisitor semantic)
+    public CompilerVisitor(Environment environment)
     {
-        this.currentEnvironment = semantic.currentEnvironment;
-        _envMap = semantic.EnvMap;
+        this.currentEnvironment = environment;
     }
 
     public override Object? VisitProgram(GolightParser.ProgramContext context)
@@ -67,46 +63,11 @@ public class CompilerVisitor : GolightBaseVisitor<Object>
             return null;
     }
 
+    //De los peores visitors en el sentido de orden, mucha debugeada y no estoy para ordenarlo ya que funciona como esta
     public override Object? VisitSlices(GolightParser.SlicesContext context)
-{
-    // Obtenemos el identificador y tipo del slice, p. ej.: numeros := []int{1,2,3,4,5}
-    string id = context.ID().GetText();
-    string tipo = context.TIPO().GetText();
-
-    c.Comment($"Declarando slice '{id}' de tipo {tipo}");
-    c.AllocateVariable(id); 
-
-    List<GolightParser.ExpressionContext> elementos = FlattenListaValores(context);
-    int count = elementos.Count;
-    
-    foreach (var expr in elementos)
-    {
-        Visit(expr);
+    {   
+        return null;
     }
-    
-    c.AllocateSlice(id, tipo, count);
-    
-    return null;
-}
-
-private List<GolightParser.ExpressionContext> FlattenListaValores(IParseTree node)
-{
-    var list = new List<GolightParser.ExpressionContext>();
-    // Si el nodo es una expresión, la agregamos
-    if (node is GolightParser.ExpressionContext expr)
-    {
-        list.Add(expr);
-    }
-    // Recorremos recursivamente sus hijos
-    for (int i = 0; i < node.ChildCount; i++)
-    {
-        var child = node.GetChild(i);
-        // Si es una coma, la ignoramos (la usaremos solamente para separar)
-        if (child.GetText() == ",") continue;
-        list.AddRange(FlattenListaValores(child));
-    }
-    return list;
-}
 
 public override Object? VisitDeclaration(GolightParser.DeclarationContext context)
 {
@@ -146,8 +107,7 @@ public override Object? VisitDeclaration(GolightParser.DeclarationContext contex
         // primero generamos la expresión
         Visit(context.expression()[0]);
         // recuperamos el tipo de la variable
-        ValueWrapper value = currentEnvironment.GetVariable(id, context.ID().Symbol);
-        string type = Utilities.GetTypeName(value);
+        string type = GetTypeFromEnvironment(id, context.ID().Symbol);
         
         if (type == "float64")
         {
@@ -568,10 +528,8 @@ public override Object? VisitSeccontrol(GolightParser.SeccontrolContext context)
 public override Object? VisitIf(GolightParser.IfContext context)
 {
     // 1) Creamos un sub‐entorno nuevo
-    Environment prevEnv = currentEnvironment;
-    // Recupera el entorno del semántico para este nodo específico
-    if (_envMap.TryGetValue(context, out Environment ifEnv))
-        currentEnvironment = ifEnv;
+    var prevEnv = currentEnvironment;
+    currentEnvironment = new Environment(prevEnv, prevEnv.Scope);
 
     c.Comment("If statement");
     int id = _ifCounter++;
@@ -617,22 +575,16 @@ public override Object? VisitIf(GolightParser.IfContext context)
 
 public override Object? VisitElseBlock(GolightParser.ElseBlockContext context)
 {
-    Environment prevEnv = currentEnvironment;
-    if (_envMap.TryGetValue(context, out Environment elseEnv))
-        currentEnvironment = elseEnv;
-
     c.Comment("Else block");
     foreach (var instr in context.instruccion())
         Visit(instr);
-    currentEnvironment = prevEnv;
     return null;
 }
 
  public override object? VisitFor(GolightParser.ForContext ctx)
 {
-    Environment prevEnv = currentEnvironment;
-    if (_envMap.TryGetValue(ctx, out Environment forEnv))
-        currentEnvironment = forEnv;
+    var prevEnv = currentEnvironment;
+    currentEnvironment = new Environment(prevEnv, prevEnv.Scope);
 
     int id       = _ifCounter++;
     string start = $"Lfor_{id}";
@@ -740,9 +692,6 @@ public override Object? VisitElseBlock(GolightParser.ElseBlockContext context)
 
 public override object? VisitSwitch(GolightParser.SwitchContext ctx)
 {
-    Environment prevEnv = currentEnvironment;
-    if (_envMap.TryGetValue(ctx, out Environment switchEnv))
-        currentEnvironment = switchEnv;
     int id      = _ifCounter++;
     string endL = $"Lswitch_end{id}";
 
@@ -796,7 +745,6 @@ public override object? VisitSwitch(GolightParser.SwitchContext ctx)
     }
 
     c.EmitLabel(endL);
-    currentEnvironment = prevEnv;
     return null;
 }
 
@@ -878,9 +826,8 @@ private Environment FindFunctionEnvironment(Environment env, string functionName
 
     public override Object? VisitBloquessentencias(GolightParser.BloquessentenciasContext ctx)
     {
-        Environment prevEnv = currentEnvironment;
-        if (_envMap.TryGetValue(ctx, out Environment blockEnv))
-        currentEnvironment = blockEnv;
+        var prevEnv = currentEnvironment;
+        currentEnvironment = new Environment(prevEnv, prevEnv.Scope);
 
         foreach (var instr in ctx.instruccion())
             Visit(instr);

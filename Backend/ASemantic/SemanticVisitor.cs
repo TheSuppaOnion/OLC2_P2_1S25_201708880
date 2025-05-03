@@ -1,7 +1,6 @@
 using System.Text;
 using analyzer;
 using Antlr4.Runtime;
-using Antlr4.Runtime.Tree;
 
 public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
 {
@@ -11,8 +10,6 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
 
     public string output = "";
     public Environment currentEnvironment;
-    private readonly Dictionary<IParseTree, Environment> _envMap = new();
-    public IReadOnlyDictionary<IParseTree, Environment> EnvMap => _envMap;
 
     public SemanticVisitor()
     {
@@ -1426,7 +1423,6 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
 
     public override ValueWrapper VisitIf(GolightParser.IfContext context)
     {
-        
         // multiples expresiones
         ValueWrapper condition;
         if (context.expression().Length > 0)
@@ -1446,7 +1442,7 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
 
         Environment previousEnvironment = currentEnvironment;
         currentEnvironment = new Environment(previousEnvironment, previousEnvironment.Scope);
-        _envMap[context] = currentEnvironment;
+
         try
         {
             if (conditionValue.Value)
@@ -1628,7 +1624,7 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
     {
         Environment previousEnvironment = currentEnvironment;
         currentEnvironment = new Environment(previousEnvironment, previousEnvironment.Scope);
-        _envMap[context] = currentEnvironment;   
+    
         try
         {   
             // Casos segun gramatica
@@ -1811,7 +1807,7 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
             {
                 throw new SemanticError("Formato de bucle for no válido", context.Start);
             }
-
+        
             return defaultVoid;
         }
         finally
@@ -1825,7 +1821,7 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
         ValueWrapper switchValue = Visit(context.expression());
         Environment previousEnvironment = currentEnvironment;
         currentEnvironment = new Environment(previousEnvironment, previousEnvironment.Scope);
-        _envMap[context] = currentEnvironment;  
+    
         try
         {
             var allCases = new List<GolightParser.CaseContext>();
@@ -2114,7 +2110,7 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
     {
         Environment previousEnvironment = currentEnvironment;
         currentEnvironment = new Environment(previousEnvironment, previousEnvironment.Scope);
-        _envMap[context] = currentEnvironment;   
+    
         foreach (var instruccion in context.instruccion())
         {
             Visit(instruccion);
@@ -2353,6 +2349,16 @@ public class SemanticVisitor : GolightBaseVisitor<ValueWrapper>
                 case ">": return new BoolValue(leftInt2.Value > rightFloat2.Value);
                 case "<=": return new BoolValue(leftInt2.Value <= rightFloat2.Value);
                 case ">=": return new BoolValue(leftInt2.Value >= rightFloat2.Value);
+            }
+        }
+        else if (left is RuneValue leftRune && right is RuneValue rightRune)
+        {
+            switch (op)
+            {
+                case "<": return new BoolValue(leftRune.Value < rightRune.Value);
+                case ">": return new BoolValue(leftRune.Value > rightRune.Value);
+                case "<=": return new BoolValue(leftRune.Value <= rightRune.Value);
+                case ">=": return new BoolValue(leftRune.Value >= rightRune.Value);
             }
         }
         else if (left is FloatValue leftFloat2 && right is IntValue rightInt2)

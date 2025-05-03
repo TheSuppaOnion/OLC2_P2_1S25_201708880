@@ -7,6 +7,7 @@ public class ARM64Generator
     private readonly Dictionary<string, string> _stringConstants = new Dictionary<string, string>();
     private readonly Dictionary<string, int> _variableOffsets = new Dictionary<string, int>();
     private readonly Dictionary<string,string> _stringLiteralMap = new Dictionary<string,string>();
+    private readonly List<string> _dataEntries = new List<string>();
     private int _stringConstantCounter = 0;
     private int _currentStackOffset = 0;
     public void EmitLabel(string label)
@@ -29,25 +30,40 @@ public class ARM64Generator
         _instructions.Add("ldp x29, x30, [sp], #16");
     }
 
-    public void AllocateSlice(string id, string tipo, int count)
+public void AllocateSlice(string id, string tipo, int count)
 {
     Comment($"Creando slice '{id}' de tipo {tipo} y {count} elementos");
-    
-    int sizeByte = 8;  
-    int totalSize = count * sizeByte;
-    
+
+    int elementSize = 8;
+    int dataSize = count * elementSize;
+    int totalSize = dataSize + 8; // +8 bytes para almacenar el count
+
+    // --- Reserva de Memoria ---
+    Push(Register.X0); Push(Register.X1); Push(Register.X2); Push(Register.X3); // Guardar registros
+
     Mov(Register.X0, totalSize);
-    Bl("malloc");
-    
-    
-    StoreVariable(id);
-    
+    Bl("malloc"); // X0 = dirección base del bloque completo (count + data)
+
+    // --- Almacenar Count y Puntero a Datos ---
+    Mov(Register.X1, count);
+    Str(Register.X1, Register.X0, 0); // Guardar 'count' en los primeros 8 bytes [X0]
+
+    Add(Register.X1, Register.X0, 8); // X1 = dirección del primer elemento de datos
+
+    Mov(Register.X0, Register.X1); // Mover puntero a datos a X0 para StoreVariable
+    StoreVariable(id);             // La variable 'id' ahora apunta al inicio de los datos
+
+    // --- Almacenar Elementos ---
+    // X1 todavía tiene el puntero a datos
     for (int i = count - 1; i >= 0; i--)
     {
-        Pop(Register.X1);
-        Comment($"Guardando elemento {i} en slice '{id}'");
-        Str(Register.X1, Register.X0, i * sizeByte);
+        Pop(Register.X0); // Obtener valor del elemento de la pila
+        Str(Register.X0, Register.X1, i * elementSize); // Guardar en datos[i]
+        Comment($"Guardado elemento {i} en slice '{id}' en offset {i * elementSize}");
     }
+
+    // --- Restaurar Registros ---
+    Pop(Register.X3); Pop(Register.X2); Pop(Register.X1); Pop(Register.X0);
 }
 
 public void AllocateVariable(string varName)
@@ -124,6 +140,23 @@ public void AllocateVariable(string varName)
     {
         _instructions.Add($"ldr {rd}, [{rt}, #{offset}]");
     }
+     // para shiftear i << 3
+    public void Lsl(string rd, string rn, int shift)
+    {
+        _instructions.Add($"lsl {rd}, {rn}, #{shift}");
+    }
+
+    // ldr con offset en registro
+    public void Ldr(string rd, string rn,string rm)
+    {
+        _instructions.Add($"ldr {rd}, [{rn}, {rm}]");
+    }
+
+    // str con offset en registro (si lo necesitas en otros sitios)
+    public void Str(string rs, string rn, string rm)
+    {
+        _instructions.Add($"str {rs}, [{rn}, {rm}]");
+    }
     public void Mov(string rd, int imm)
     {
         _instructions.Add($"mov {rd}, #{imm}");
@@ -171,6 +204,10 @@ public void AllocateVariable(string varName)
     {
         _instructions.Add($"csel {rd}, {rn}, {rm}, {condition}");
     }
+    public void B(string label, string condition)
+    {
+        _instructions.Add($"b{condition} {label}");
+    }
     
 public void StoreVariableFloat(string varName)
 {
@@ -214,6 +251,17 @@ public string RegisterFloat(double value)
     _instructions.Add($".text");
     return label;
 }
+
+public string RegisterIntSlice(string name, int[] valores)
+    {
+        if (!_dataEntries.Any(e => e.StartsWith(name + ":")))
+        {
+            _dataEntries.Add($"{name}:");
+            _dataEntries.Add($"    .word {string.Join(", ", valores)}");
+        }
+        return name;
+    }
+
 
 public void LoadFloatValue(double value)
 {
@@ -366,15 +414,19 @@ public override string ToString()
     sb.AppendLine(".data");
     
     // Definir constantes de string
-    foreach (var stringConst in _stringConstants)
+    foreach (var kv in _stringConstants)
     {
-        // Escapar el newline correctamente
-        string value = stringConst.Value.Replace("\n", "\\n");
-        sb.AppendLine($"{stringConst.Key}:");
+        var value = kv.Value.Replace("\n", "\\n");
+        sb.AppendLine($"{kv.Key}:");
         sb.AppendLine($"    .ascii \"{value}\"");
-        sb.AppendLine("    .align 4");  
+        sb.AppendLine("    .align 4");
     }
-
+    // luego los slices
+    foreach (var entry in _dataEntries)
+    {
+        sb.AppendLine(entry);
+    }
+    
     // Sección .text
     sb.AppendLine("\n.text");
     sb.AppendLine(".global _start");         
